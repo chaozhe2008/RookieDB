@@ -145,9 +145,7 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
-
-        return Optional.empty();
+        return root.get(key).getKey(key);
     }
 
     /**
@@ -403,7 +401,6 @@ public class BPlusTree {
      **/
     private void updateRoot(BPlusNode newRoot) {
         this.root = newRoot;
-
         metadata.setRootPageNum(this.root.getPage().getPageNum());
         metadata.incrementHeight();
         TransactionContext transaction = TransactionContext.getTransaction();

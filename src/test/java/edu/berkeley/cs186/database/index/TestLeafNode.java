@@ -316,7 +316,6 @@ public class TestLeafNode {
         LeafNode leaf = new LeafNode(metadata, bufferManager, keys, rids, Optional.of(42L), treeContext);
 
         long pageNum = leaf.getPage().getPageNum();
-
         assertEquals(leaf, LeafNode.fromBytes(metadata, bufferManager, treeContext, pageNum));
 
         for (int i = 0; i < 10; i++) {
@@ -326,6 +325,7 @@ public class TestLeafNode {
             leaf = new LeafNode(metadata, bufferManager, keys, rids, Optional.of(42L), treeContext);
 
             pageNum = leaf.getPage().getPageNum();
+
 
             assertEquals(leaf, LeafNode.fromBytes(metadata, bufferManager, treeContext, pageNum));
         }

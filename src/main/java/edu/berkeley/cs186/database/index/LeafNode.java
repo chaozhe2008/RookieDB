@@ -146,17 +146,13 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
-
-        return null;
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        // TODO(proj2): implement
-
-        return null;
+        return this;
     }
 
     // See BPlusNode.put.
@@ -336,7 +332,7 @@ class LeafNode extends BPlusNode {
         // For example, the following bytes:
         //
         //   +----+-------------------------+-------------+----+-------------------------------+
-        //   | 01 | 00 00 00 00 00 00 00 04 | 00 00 00 01 | 03 | 00 00 00 00 00 00 00 03 00 01 |
+        //   | 01 | 00 00 00 00 00 00 00 04 | 00 00 00 01 | 03 | 00 00 00 00 00 00 00 03 | 00 01 |
         //   +----+-------------------------+-------------+----+-------------------------------+
         //    \__/ \_______________________/ \___________/ \__________________________________/
         //     a               b                   c                         d
@@ -372,12 +368,32 @@ class LeafNode extends BPlusNode {
      */
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
                                      LockContext treeContext, long pageNum) {
-        // TODO(proj2): implement
         // Note: LeafNode has two constructors. To implement fromBytes be sure to
         // use the constructor that reuses an existing page instead of fetching a
         // brand new one.
 
-        return null;
+        Page page = bufferManager.fetchPage(treeContext, pageNum);
+        Buffer buf = page.getBuffer();
+
+        byte nodeType = buf.get();
+        assert(nodeType == (byte) 1);
+
+        Long rightSibling = buf.getLong();
+
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> records = new ArrayList<>();
+
+        int n = buf.getInt();
+        for (int i = 0; i < n; ++i) {
+            keys.add(DataBox.fromBytes(buf, metadata.getKeySchema()));
+            Long pageNumber = buf.getLong();
+            Short entryNumber = buf.getShort();
+            records.add(new RecordId(pageNumber, entryNumber));
+        }
+//        for (int i = 0; i < n + 1; ++i) {
+//            children.add(buf.getLong());
+//        }
+        return new LeafNode(metadata, bufferManager, page, keys, records, Optional.of(rightSibling), treeContext);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////
