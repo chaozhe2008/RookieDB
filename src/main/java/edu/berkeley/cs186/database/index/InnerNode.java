@@ -95,7 +95,33 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        return Optional.empty();
+        int order = metadata.getOrder();
+        Optional<Pair<DataBox, Long>> res = Optional.empty();
+        int index = numLessThanEqual(key, keys);
+        BPlusNode targetChild = getChild(index);
+        Optional<Pair<DataBox, Long>> childRes = targetChild.put(key, rid);
+        if (childRes.isPresent()) {
+            DataBox newKey = childRes.get().getFirst();
+            Long newPageNum = childRes.get().getSecond();
+            int newIndex = numLessThanEqual(newKey, keys);
+            keys.add(newIndex, newKey);
+            children.add(newIndex, newPageNum);
+            //split
+            if (keys.size() > 2 * order) {
+                List<DataBox> leftKeys = keys.subList(0, order);
+                List<DataBox> rightKeys = keys.subList(order + 1, keys.size());
+                List<Long> leftChildren = children.subList(0, order + 1);
+                List<Long> rightChildren = children.subList(order + 1, children.size());
+                DataBox splitKey = keys.get(order);
+                keys = leftKeys;
+                children = leftChildren;
+                InnerNode newInnerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
+                Long splitPageNum = newInnerNode.getPage().getPageNum();
+                res = Optional.of(new Pair<>(splitKey, splitPageNum));
+            }
+        }
+        sync();
+        return res;
     }
 
     // See BPlusNode.bulkLoad.

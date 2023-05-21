@@ -158,9 +158,31 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        int order = metadata.getOrder();
+        int index = InnerNode.numLessThanEqual(key, keys);
+        if (index > 0 && keys.get(index - 1).equals(key)){
+            throw new BPlusTreeException("Repeated Key: " + key);
+        }
+        this.keys.add(index, key);
+        this.rids.add(index, rid);
+        Optional<Pair<DataBox, Long>> res = Optional.empty();
+        if (this.keys.size() > 2 * order){
+            //split
+            List<DataBox> leftKeys = keys.subList(0, order);
+            List<DataBox> rightKeys = keys.subList(order, keys.size());
+            List<RecordId> leftRids = rids.subList(0, order);
+            List<RecordId> rightRids = rids.subList(order, keys.size());
+            this.keys = leftKeys;
+            this.rids = leftRids;
 
-        return Optional.empty();
+            LeafNode newNode = new LeafNode(metadata, bufferManager, rightKeys,
+                    rightRids, this.rightSibling, treeContext);
+            Long newPageNum = newNode.getPage().getPageNum();
+            this.rightSibling = Optional.of(newPageNum);
+            res = Optional.of(new Pair<>(key, newPageNum));
+        }
+        sync();
+        return res;
     }
 
     // See BPlusNode.bulkLoad.
@@ -390,9 +412,6 @@ class LeafNode extends BPlusNode {
             Short entryNumber = buf.getShort();
             records.add(new RecordId(pageNumber, entryNumber));
         }
-//        for (int i = 0; i < n + 1; ++i) {
-//            children.add(buf.getLong());
-//        }
         return new LeafNode(metadata, bufferManager, page, keys, records, Optional.of(rightSibling), treeContext);
     }
 
