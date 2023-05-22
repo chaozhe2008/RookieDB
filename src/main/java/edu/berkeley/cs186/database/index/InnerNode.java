@@ -105,16 +105,14 @@ class InnerNode extends BPlusNode {
             Long newPageNum = childRes.get().getSecond();
             int newIndex = numLessThanEqual(newKey, keys);
             keys.add(newIndex, newKey);
-            children.add(newIndex, newPageNum);
+            children.add(newIndex+1, newPageNum); // +1 is important detail
             //split
             if (keys.size() > 2 * order) {
-                List<DataBox> leftKeys = keys.subList(0, order);
                 List<DataBox> rightKeys = keys.subList(order + 1, keys.size());
-                List<Long> leftChildren = children.subList(0, order + 1);
                 List<Long> rightChildren = children.subList(order + 1, children.size());
                 DataBox splitKey = keys.get(order);
-                keys = leftKeys;
-                children = leftChildren;
+                keys = keys.subList(0, order);
+                children = children.subList(0, order + 1);
                 InnerNode newInnerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
                 Long splitPageNum = newInnerNode.getPage().getPageNum();
                 res = Optional.of(new Pair<>(splitKey, splitPageNum));
@@ -137,8 +135,8 @@ class InnerNode extends BPlusNode {
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
-
-        return;
+        int index = numLessThanEqual(key, keys);
+        getChild(index).remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////

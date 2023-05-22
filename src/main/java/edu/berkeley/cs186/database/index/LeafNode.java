@@ -158,28 +158,27 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        int order = metadata.getOrder();
-        int index = InnerNode.numLessThanEqual(key, keys);
-        if (index > 0 && keys.get(index - 1).equals(key)){
+        if (keys.contains(key)){
             throw new BPlusTreeException("Repeated Key: " + key);
         }
-        this.keys.add(index, key);
-        this.rids.add(index, rid);
+        int order = metadata.getOrder();
+        int index = InnerNode.numLessThanEqual(key, keys);
+
+        keys.add(index, key);
+        rids.add(index, rid);
         Optional<Pair<DataBox, Long>> res = Optional.empty();
-        if (this.keys.size() > 2 * order){
+        if (keys.size() > 2 * order){
             //split
-            List<DataBox> leftKeys = keys.subList(0, order);
             List<DataBox> rightKeys = keys.subList(order, keys.size());
-            List<RecordId> leftRids = rids.subList(0, order);
-            List<RecordId> rightRids = rids.subList(order, keys.size());
-            this.keys = leftKeys;
-            this.rids = leftRids;
+            List<RecordId> rightRids = rids.subList(order, rids.size());
+            keys = keys.subList(0, order);;
+            rids = rids.subList(0, order);
 
             LeafNode newNode = new LeafNode(metadata, bufferManager, rightKeys,
-                    rightRids, this.rightSibling, treeContext);
+                    rightRids, rightSibling, treeContext);
             Long newPageNum = newNode.getPage().getPageNum();
-            this.rightSibling = Optional.of(newPageNum);
-            res = Optional.of(new Pair<>(key, newPageNum));
+            rightSibling = Optional.of(newPageNum);
+            res = Optional.of(new Pair<>(rightKeys.get(0), newPageNum));
         }
         sync();
         return res;
@@ -198,8 +197,13 @@ class LeafNode extends BPlusNode {
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
-
-        return;
+        int index = keys.indexOf(key);
+        if (index == -1) {
+            return;
+        }
+        keys.remove(index);
+        rids.remove(index);
+        sync();
     }
 
     // Iterators ///////////////////////////////////////////////////////////////
@@ -400,7 +404,8 @@ class LeafNode extends BPlusNode {
         byte nodeType = buf.get();
         assert(nodeType == (byte) 1);
 
-        Long rightSibling = buf.getLong();
+        Long rightSibByte = buf.getLong();
+        Optional<Long> rightSibling = rightSibByte == -1L ? Optional.empty() : Optional.of(rightSibByte);
 
         List<DataBox> keys = new ArrayList<>();
         List<RecordId> records = new ArrayList<>();
@@ -412,7 +417,7 @@ class LeafNode extends BPlusNode {
             Short entryNumber = buf.getShort();
             records.add(new RecordId(pageNumber, entryNumber));
         }
-        return new LeafNode(metadata, bufferManager, page, keys, records, Optional.of(rightSibling), treeContext);
+        return new LeafNode(metadata, bufferManager, page, keys, records, rightSibling, treeContext);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////
