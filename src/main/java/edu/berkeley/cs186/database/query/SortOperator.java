@@ -87,13 +87,19 @@ public class SortOperator extends QueryOperator {
      */
     public Run sortRun(Iterator<Record> records) {
         // TODO(proj3_part1): implement
-        return null;
+        RecordComparator comparator = new RecordComparator();
+        List<Record> tempRecordsList = new ArrayList<>();
+        while(records.hasNext()){
+            tempRecordsList.add(records.next());
+        }
+        Collections.sort(tempRecordsList, comparator);
+        return makeRun(tempRecordsList);
     }
 
     /**
      * Given a list of sorted runs, returns a new run that is the result of
      * merging the input runs. You should use a Priority Queue (java.util.PriorityQueue)
-     * to determine which record should be should be added to the output run
+     * to determine which record should be added to the output run
      * next.
      *
      * You are NOT allowed to have more than runs.size() records in your
@@ -108,7 +114,31 @@ public class SortOperator extends QueryOperator {
     public Run mergeSortedRuns(List<Run> runs) {
         assert (runs.size() <= this.numBuffers - 1);
         // TODO(proj3_part1): implement
-        return null;
+        PriorityQueue<Pair<Record, Integer>> pQueue = new PriorityQueue<>(new RecordPairComparator());
+        List<Record> resultList = new ArrayList<>();
+        List<Iterator<Record>> iterators = new ArrayList<>();
+        int numRuns = runs.size();
+        for(int i = 0; i < numRuns; i++){
+            Iterator<Record> currIterator = runs.get(i).iterator();
+            iterators.add(currIterator);
+            if(currIterator.hasNext()){
+                pQueue.offer(new Pair<>(currIterator.next(), i));
+            }
+        }
+
+        Pair<Record, Integer> poppedPair;
+        Record poppedRecord;
+        int poppedIndex;
+        while(!pQueue.isEmpty()){
+            poppedPair = pQueue.poll();
+            poppedRecord = poppedPair.getFirst();
+            poppedIndex = poppedPair.getSecond();
+            resultList.add(poppedRecord);
+            if(iterators.get(poppedIndex).hasNext()){
+                pQueue.offer((new Pair<>(iterators.get(poppedIndex).next(), poppedIndex)));
+            }
+        }
+        return makeRun(resultList);
     }
 
     /**
@@ -133,7 +163,11 @@ public class SortOperator extends QueryOperator {
      */
     public List<Run> mergePass(List<Run> runs) {
         // TODO(proj3_part1): implement
-        return Collections.emptyList();
+        List<Run> resultList = new ArrayList<>();
+        for(int i = 0; i < runs.size(); i += numBuffers - 1){
+            resultList.add(mergeSortedRuns(runs.subList(i, Math.min(runs.size(), i + numBuffers - 1))));
+        }
+        return resultList;
     }
 
     /**
@@ -141,15 +175,29 @@ public class SortOperator extends QueryOperator {
      * You may find the getBlockIterator method of the QueryOperator class useful
      * here to create your initial set of sorted runs.
      *
-     * @return a single run containing all of the source operator's records in
+     * @return a single run containing all the source operator's records in
      * sorted order.
      */
     public Run sort() {
         // Iterator over the records of the relation we want to sort
         Iterator<Record> sourceIterator = getSource().iterator();
 
-        // TODO(proj3_part1): implement
-        return makeRun(); // TODO(proj3_part1): replace this!
+        //conquer stage
+        List<Run> blocks = new ArrayList<>();
+        Run currentBlock;
+        while(sourceIterator.hasNext()){
+            Iterator<Record> blockIterator = getBlockIterator(sourceIterator, getSchema(), numBuffers);
+            currentBlock = sortRun(blockIterator);
+            blocks.add(currentBlock);
+        }
+
+        List<Run> tempList;
+        //merge stage
+        while (blocks.size() > 1){
+            tempList = mergePass(blocks);
+            blocks = tempList;
+        }
+        return blocks.get(0);
     }
 
     /**
