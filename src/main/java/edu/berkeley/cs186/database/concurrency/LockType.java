@@ -21,8 +21,11 @@ public enum LockType {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
+        if (a == NL || b == NL) return true;
+        if (a == X || b == X) return false;
+        if (a == IS || b == IS) return true;
+        if (a == SIX || b == SIX) return false;
+        if (a == b) return true;
         return false;
     }
 
@@ -53,9 +56,14 @@ public enum LockType {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        if (childLockType == NL || parentLockType == IX) {
+            return true;
+        }
+        if (parentLockType == NL || parentLockType == S || parentLockType == X) {
+            return false;
+        }
+        return parentLockType == IS && (childLockType == IS || childLockType == S) ||
+                parentLockType == SIX && (childLockType == IX || childLockType == X);
     }
 
     /**
@@ -68,10 +76,15 @@ public enum LockType {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        if (required == NL || substitute == required || substitute == X) {
+            return true;
+        }
+        if (required == SIX || required == X) {
+            return false;
+        }
+        return substitute == SIX || (required == IS && substitute == IX);
     }
+
 
     /**
      * @return True if this lock is IX, IS, or SIX. False otherwise.
