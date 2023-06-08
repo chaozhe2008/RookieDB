@@ -1,6 +1,11 @@
 package edu.berkeley.cs186.database.concurrency;
 
 import edu.berkeley.cs186.database.TransactionContext;
+import edu.berkeley.cs186.database.common.Pair;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * LockUtil is a declarative layer which simplifies multigranularity lock
@@ -41,9 +46,85 @@ public class LockUtil {
         LockType effectiveLockType = lockContext.getEffectiveLockType(transaction);
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
-        // TODO(proj4_part2): implement
-        return;
+        if (LockType.substitutable(effectiveLockType, requestType)) return;
+
+        LockType newType;
+        if (requestType == LockType.S){
+            if (effectiveLockType == LockType.IS || effectiveLockType == LockType.NL) newType = LockType.S;
+            else if(effectiveLockType == LockType.IX) newType = LockType.SIX;
+            else return;
+        } else {
+            newType = LockType.X;
+        }
+        if (newType == explicitLockType) return;
+
+        // Deal with parents
+        ensureParentLock(transaction, lockContext, parentContext, newType);
+
+        // Deal with current resource
+        if (newType == LockType.S){
+            if(effectiveLockType == LockType.IS){
+                lockContext.escalate(transaction);
+            } else {
+                lockContext.acquire(transaction, LockType.S);
+            }
+        } else if (newType == LockType.SIX){
+            lockContext.promote(transaction, LockType.SIX);
+        } else {
+            //newType = X
+            if (effectiveLockType == LockType.NL){
+                lockContext.acquire(transaction, LockType.X);
+            } else {
+                lockContext.escalate(transaction);
+                if (lockContext.getEffectiveLockType(transaction) == LockType.S) {
+                    lockContext.promote(transaction, LockType.X);
+                }
+            }
+        }
     }
 
-    // TODO(proj4_part2) add any helper methods you want
+    public static void ensureParentLock(TransactionContext transaction, LockContext lockContext, LockContext parentContext, LockType requestType){
+        if (requestType == LockType.SIX) return;
+
+        // S request
+        if (requestType == LockType.S){
+            List<LockContext> needIsContext = new ArrayList<>();
+            while (parentContext != null){
+                LockType type = parentContext.getExplicitLockType(transaction);
+                if (type == LockType.NL) needIsContext.add(0, parentContext);
+                parentContext = parentContext.parentContext();
+            }
+            for(LockContext ctx: needIsContext){
+                ctx.acquire(transaction, LockType.IS);
+            }
+        }
+
+        // X request
+        if (requestType == LockType.X){
+            List<Pair<LockContext, String>> needModifyContext = new ArrayList<>();
+            // "A": acquire IX "B": promote SIX "C": promote IX
+            while (parentContext != null){
+                LockType type = parentContext.getExplicitLockType(transaction);
+                if (type == LockType.NL) {
+                    needModifyContext.add(0, new Pair<>(parentContext, "A" ));
+                } else if (type == LockType.S) {
+                    needModifyContext.add(0, new Pair<>(parentContext, "B" ));
+                } else if (type == LockType.IS) {
+                    needModifyContext.add(0, new Pair<>(parentContext, "C" ));
+                }
+                parentContext = parentContext.parentContext();
+            }
+
+            for(Pair<LockContext, String> item: needModifyContext){
+                LockContext ctx = item.getFirst();
+                String flag = item.getSecond();
+                switch(flag){
+                    case "A": ctx.acquire(transaction, LockType.IX);break;
+                    case "B": ctx.promote(transaction, LockType.SIX);break;
+                    case "C": ctx.promote(transaction, LockType.IX);break;
+                }
+            }
+        }
+    }
+
 }

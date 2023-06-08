@@ -285,7 +285,6 @@ public class TestDatabase2PL {
         try(Transaction t1 = beginTransaction()) {
             // Update the last record in the table
             t1.getTransactionContext().updateRecord(tableName, rids.get(rids.size() - 1), input);
-
             assertEquals(prepare(t1.getTransNum(),
                     "acquire %s database IX",
                     "acquire %s database/testtable1 IX",

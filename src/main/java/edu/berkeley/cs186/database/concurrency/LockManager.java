@@ -335,6 +335,7 @@ public class LockManager {
             LockType lockType = getLockType(transaction, name);
             Lock lock = new Lock(name, lockType, transaction.getTransNum());
             getResourceEntry(name).releaseLock(lock);
+
         }
     }
 
@@ -373,8 +374,7 @@ public class LockManager {
             Lock lock = new Lock(name, newLockType, transactionNum);
             LockRequest request = new LockRequest(transaction, lock);
             if(lockEntry.checkCompatible(newLockType, transactionNum)){
-                release(transaction, name);
-                acquire(transaction, name, newLockType);
+                lockEntry.grantOrUpdateLock(lock);
             } else {
                 lockEntry.addToQueue(request, true);
                 transaction.prepareBlock();
